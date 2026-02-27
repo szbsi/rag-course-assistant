@@ -6,13 +6,16 @@ from typing import List, Optional, Dict, Any
 class AIGenerator:
     """Handles interactions with DeepSeek API for generating responses"""
 
+    MAX_TOOL_ROUNDS = 2  # Maximum sequential tool-call rounds per query
+
     # Static system prompt to avoid rebuilding on each call
     SYSTEM_PROMPT = """ You are an AI assistant specialized in course materials and educational content with access to a comprehensive search tool for course information.
 
 Search Tool Usage:
 - Use the search tool **only** for questions about specific course content or detailed educational materials
-- **One search per query maximum** — never attempt a second search
-- Synthesize search results into accurate, fact-based responses
+- **Up to two sequential searches per query** — use a second search only when the first result is insufficient, or the question spans two distinct topics/courses
+- Do NOT search twice for the same query string — vary parameters meaningfully
+- Synthesize ALL search results into a single coherent response
 - If search yields no results, state this clearly without offering alternatives
 - IMPORTANT: Always use the provided function calling interface. Never output function calls as raw text or XML markup.
 
@@ -88,7 +91,7 @@ Provide only the direct answer to what was asked.
 
         # Handle tool execution if needed
         if response.choices[0].finish_reason == "tool_calls" and tool_manager:
-            return self._handle_tool_execution(response, messages, tool_manager)
+            return self._handle_tool_execution_loop(response, messages, tools, tool_manager)
 
         # Fallback: detect DeepSeek native DSML function call format in text content
         content = response.choices[0].message.content
@@ -97,55 +100,83 @@ Provide only the direct answer to what was asked.
             if dsml_call:
                 return self._handle_dsml_tool_execution(dsml_call, messages, tool_manager)
 
-        return content
+        return content or ""
 
-    def _handle_tool_execution(self, initial_response, messages: List, tool_manager) -> str:
+    def _execute_tool_calls(self, assistant_message, messages: List, tool_manager) -> bool:
         """
-        Handle execution of tool calls and get follow-up response.
-
-        Args:
-            initial_response: The response containing tool call requests
-            messages: Current message history
-            tool_manager: Manager to execute tools
+        Execute all tool calls in an assistant message, appending results to messages.
 
         Returns:
-            Final response text after tool execution
+            True if at least one tool call succeeded, False if all failed.
         """
-        assistant_message = initial_response.choices[0].message
-
-        # Add assistant's tool call message to history
-        messages.append(assistant_message)
-
-        # Execute all tool calls and collect results
+        had_any_success = False
         for tool_call in assistant_message.tool_calls:
-            tool_result = tool_manager.execute_tool(
-                tool_call.function.name,
-                **json.loads(tool_call.function.arguments)
-            )
+            try:
+                tool_result = tool_manager.execute_tool(
+                    tool_call.function.name,
+                    **json.loads(tool_call.function.arguments)
+                )
+                had_any_success = True
+            except Exception as e:
+                tool_result = f"Tool execution failed: {str(e)}"
 
             messages.append({
                 "role": "tool",
                 "tool_call_id": tool_call.id,
                 "content": tool_result
             })
+        return had_any_success
 
-        # Prepare final API call without tools
-        final_params = {
-            **self.base_params,
-            "messages": messages,
-        }
+    def _handle_tool_execution_loop(
+        self, initial_response, messages: List, tools: Optional[List], tool_manager
+    ) -> str:
+        """
+        Execute up to MAX_TOOL_ROUNDS sequential tool-call rounds.
 
-        # Get final response
+        Each round: execute tools → call API with tools → check if another round needed.
+        After the loop, one final API call without tools synthesizes the answer.
+        """
+        current_response = initial_response
+        round_num = 0
+
+        while round_num < self.MAX_TOOL_ROUNDS:
+            assistant_message = current_response.choices[0].message
+            messages.append(assistant_message)
+
+            had_any_success = self._execute_tool_calls(assistant_message, messages, tool_manager)
+
+            # On total failure, skip remaining rounds and go straight to synthesis
+            if not had_any_success:
+                break
+
+            # Call API with tools so the model can decide whether to search again
+            next_params = {
+                **self.base_params,
+                "messages": messages,
+                "tools": tools,
+                "tool_choice": "auto",
+            }
+            next_response = self.client.chat.completions.create(**next_params)
+
+            if next_response.choices[0].finish_reason != "tool_calls":
+                # Model chose not to call another tool; append its message and stop looping
+                messages.append(next_response.choices[0].message)
+                break
+
+            current_response = next_response
+            round_num += 1
+
+        # Final synthesis call without tools
+        final_params = {**self.base_params, "messages": messages}
         final_response = self.client.chat.completions.create(**final_params)
         final_content = final_response.choices[0].message.content
 
-        # If the synthesis response also contains DSML, parse and execute it once more
         if tool_manager and final_content and '<｜DSML｜function_calls>' in final_content:
             dsml_call = self._parse_dsml_tool_call(final_content)
             if dsml_call:
                 return self._handle_dsml_tool_execution(dsml_call, messages, tool_manager)
 
-        return final_content
+        return final_content or ""
 
     def _parse_dsml_tool_call(self, content: str) -> Optional[Dict]:
         """Parse DeepSeek native DSML function call format embedded in text content"""
