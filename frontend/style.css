@@ -241,8 +241,43 @@ header h1 {
 }
 
 .sources-content {
-    padding: 0 0.5rem 0.25rem 1.5rem;
-    color: var(--text-secondary);
+    padding: 0.25rem 0.5rem 0.25rem 1.5rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+}
+
+.sources-content a {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.25rem 0.75rem 0.25rem 0.55rem;
+    background: rgba(var(--src-rgb), 0.12);
+    border: 1px solid rgba(var(--src-rgb), 0.35);
+    border-radius: 999px;
+    color: var(--src-color);
+    font-size: 0.72rem;
+    font-weight: 500;
+    text-decoration: none;
+    white-space: nowrap;
+    transition: background 0.15s, border-color 0.15s, color 0.15s, transform 0.1s;
+}
+
+.sources-content a::before {
+    content: '';
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--src-color);
+    opacity: 0.8;
+    flex-shrink: 0;
+}
+
+.sources-content a:hover {
+    background: rgba(var(--src-rgb), 0.25);
+    border-color: rgba(var(--src-rgb), 0.65);
+    transform: translateY(-1px);
 }
 
 /* Markdown formatting styles */
@@ -446,6 +481,55 @@ header h1 {
 }
 
 /* Sidebar Headers */
+.sidebar-top-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.lang-toggle {
+    flex-shrink: 0;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 0.3rem 0.6rem;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: none;
+    letter-spacing: 0.3px;
+    transition: color 0.2s ease, background 0.2s ease, border-color 0.2s ease;
+}
+
+.lang-toggle:hover {
+    color: var(--primary-color);
+    background: rgba(37, 99, 235, 0.08);
+    border-color: rgba(37, 99, 235, 0.4);
+}
+
+.new-chat-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 0.5rem 0;
+    border: none;
+    border-radius: 0;
+    background: none;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    transition: color 0.2s ease;
+}
+
+.new-chat-btn:hover {
+    color: var(--primary-color);
+    background: none;
+}
+
 .stats-header,
 .suggested-header {
     font-size: 0.875rem;

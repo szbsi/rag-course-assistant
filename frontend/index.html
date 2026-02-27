@@ -7,7 +7,7 @@
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
     <title>Course Materials Assistant</title>
-    <link rel="stylesheet" href="style.css?v=9">
+    <link rel="stylesheet" href="style.css?v=15">
 </head>
 <body>
     <div class="container">
@@ -19,18 +19,30 @@
         <div class="main-content">
             <!-- Left Sidebar -->
             <aside class="sidebar">
+                <!-- Language Toggle + New Chat -->
+                <div class="sidebar-top-bar">
+                    <button id="newChatBtn" class="new-chat-btn">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+                            <line x1="12" y1="5" x2="12" y2="19"></line>
+                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                        </svg>
+                        <span data-i18n="newChat">NEW CHAT</span>
+                    </button>
+                    <button id="langToggle" class="lang-toggle">中文</button>
+                </div>
+
                 <!-- Course Stats -->
                 <div class="sidebar-section">
                     <details class="stats-collapsible">
-                        <summary class="stats-header">Courses</summary>
+                        <summary class="stats-header" data-i18n="courses">Courses</summary>
                         <div class="course-stats" id="courseStats">
                             <div class="stat-item">
-                                <span class="stat-label">Number of courses:</span>
+                                <span class="stat-label" data-i18n="courseCount">Number of courses:</span>
                                 <span class="stat-value" id="totalCourses">-</span>
                             </div>
                             <div class="stat-item">
                                 <div class="course-titles" id="courseTitles">
-                                    <span class="loading">Loading...</span>
+                                    <span class="loading" data-i18n="loading">Loading...</span>
                                 </div>
                             </div>
                         </div>
@@ -40,12 +52,28 @@
                 <!-- Suggested Questions -->
                 <div class="sidebar-section">
                     <details class="suggested-collapsible">
-                        <summary class="suggested-header">Try asking:</summary>
+                        <summary class="suggested-header" data-i18n="tryAsking">Try asking:</summary>
                         <div class="suggested-items">
-                            <button class="suggested-item" data-question="What is the outline of the &quot;MCP: Build Rich-Context AI Apps with Anthropic&quot; course?">Outline of a course</button>
-                            <button class="suggested-item" data-question="Are there any courses that include a Chatbot implementation?">Courses about Chatbot</button>
-                            <button class="suggested-item" data-question="Are there any courses that explain what RAG is?">Courses explaining RAG</button>
-                            <button class="suggested-item" data-question="What was covered in lesson 5 of the MCP course?">Details of a course's lesson</button>
+                            <button class="suggested-item"
+                                data-question-en="What is the outline of the &quot;MCP: Build Rich-Context AI Apps with Anthropic&quot; course?"
+                                data-question-zh="&quot;MCP: Build Rich-Context AI Apps with Anthropic&quot; 课程的概要是什么？"
+                                data-label-en="Outline of a course"
+                                data-label-zh="课程大纲">Outline of a course</button>
+                            <button class="suggested-item"
+                                data-question-en="Are there any courses that include a Chatbot implementation?"
+                                data-question-zh="有哪些课程包含聊天机器人的实现？"
+                                data-label-en="Courses about Chatbot"
+                                data-label-zh="聊天机器人相关课程">Courses about Chatbot</button>
+                            <button class="suggested-item"
+                                data-question-en="Are there any courses that explain what RAG is?"
+                                data-question-zh="有哪些课程解释了什么是 RAG？"
+                                data-label-en="Courses explaining RAG"
+                                data-label-zh="解释 RAG 的课程">Courses explaining RAG</button>
+                            <button class="suggested-item"
+                                data-question-en="What was covered in lesson 5 of the MCP course?"
+                                data-question-zh="MCP 课程第 5 节涵盖了哪些内容？"
+                                data-label-en="Details of a course's lesson"
+                                data-label-zh="课程某节详情">Details of a course's lesson</button>
                         </div>
                     </details>
                 </div>
@@ -76,6 +104,6 @@
 
 
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    <script src="script.js?v=9"></script>
+    <script src="script.js?v=14"></script>
 </body>
 </html>

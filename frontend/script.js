@@ -1,6 +1,63 @@
 // API base URL - use relative path to work from any host
 const API_URL = '/api';
 
+// i18n translations
+const TRANSLATIONS = {
+    en: {
+        newChat:     'NEW CHAT',
+        courses:     'Courses',
+        courseCount: 'Number of courses:',
+        tryAsking:   'Try asking:',
+        loading:     'Loading...',
+        failedLoad:  'Failed to load courses',
+        placeholder: 'Ask about courses, lessons, or specific content...',
+        sources:     'Sources',
+        welcome:     'Welcome to the Course Materials Assistant! I can help you with questions about courses, lessons and specific content. What would you like to know?',
+        langLabel:   '中文',
+    },
+    zh: {
+        newChat:     '新对话',
+        courses:     '课程',
+        courseCount: '课程数量：',
+        tryAsking:   '试着问：',
+        loading:     '加载中...',
+        failedLoad:  '课程加载失败',
+        placeholder: '询问课程、课节或具体内容...',
+        sources:     '来源',
+        welcome:     '欢迎使用课程资料助手！我可以帮助您解答有关课程、课节和具体内容的问题。您想了解什么？',
+        langLabel:   'EN',
+    },
+};
+
+let currentLang = localStorage.getItem('lang') || 'en';
+
+function applyLanguage(lang) {
+    currentLang = lang;
+    localStorage.setItem('lang', lang);
+    const t = TRANSLATIONS[lang];
+
+    // Update all data-i18n elements
+    document.querySelectorAll('[data-i18n]').forEach(el => {
+        const key = el.getAttribute('data-i18n');
+        if (t[key] !== undefined) el.textContent = t[key];
+    });
+
+    // Update suggested item labels and active data-question
+    document.querySelectorAll('.suggested-item').forEach(btn => {
+        const label = btn.getAttribute(`data-label-${lang}`);
+        if (label) btn.textContent = label;
+        const q = btn.getAttribute(`data-question-${lang}`) || btn.getAttribute('data-question-en');
+        if (q) btn.setAttribute('data-question', q);
+    });
+
+    // Update input placeholder
+    if (chatInput) chatInput.placeholder = t.placeholder;
+
+    // Update lang toggle label
+    const toggle = document.getElementById('langToggle');
+    if (toggle) toggle.textContent = t.langLabel;
+}
+
 // Global state
 let currentSessionId = null;
 
@@ -17,8 +74,13 @@ document.addEventListener('DOMContentLoaded', () => {
     courseTitles = document.getElementById('courseTitles');
     
     setupEventListeners();
+    applyLanguage(currentLang);
     createNewSession();
     loadCourseStats();
+    document.getElementById('newChatBtn').addEventListener('click', createNewSession);
+    document.getElementById('langToggle').addEventListener('click', () => {
+        applyLanguage(currentLang === 'en' ? 'zh' : 'en');
+    });
 });
 
 // Event Listeners
@@ -122,18 +184,34 @@ function addMessage(content, type, sources = null, isWelcome = false) {
     let html = `<div class="message-content">${displayContent}</div>`;
     
     if (sources && sources.length > 0) {
+        const SOURCE_COLORS = [
+            { rgb: '59,130,246',  color: '#93c5fd' },  // blue
+            { rgb: '139,92,246',  color: '#c4b5fd' },  // purple
+            { rgb: '20,184,166',  color: '#5eead4' },  // teal
+            { rgb: '245,158,11',  color: '#fcd34d' },  // amber
+            { rgb: '244,63,94',   color: '#fda4af' },  // rose
+            { rgb: '16,185,129',  color: '#6ee7b7' },  // emerald
+        ];
+        const sourceLinks = sources.map((s, i) => {
+            const c = SOURCE_COLORS[i % SOURCE_COLORS.length];
+            const style = `--src-rgb:${c.rgb};--src-color:${c.color}`;
+            if (s.url) {
+                return `<a href="${s.url}" target="_blank" rel="noopener noreferrer" style="${style}">${escapeHtml(s.text)}</a>`;
+            }
+            return `<span style="${style};display:inline-block;padding:0.25rem 0.75rem;border-radius:999px;font-size:0.72rem;border:1px solid rgba(${c.rgb},0.35);color:${c.color}">${escapeHtml(s.text)}</span>`;
+        });
         html += `
             <details class="sources-collapsible">
-                <summary class="sources-header">Sources</summary>
-                <div class="sources-content">${sources.join(', ')}</div>
+                <summary class="sources-header">${TRANSLATIONS[currentLang].sources}</summary>
+                <div class="sources-content">${sourceLinks.join('')}</div>
             </details>
         `;
     }
-    
+
     messageDiv.innerHTML = html;
     chatMessages.appendChild(messageDiv);
     chatMessages.scrollTop = chatMessages.scrollHeight;
-    
+
     return messageId;
 }
 
@@ -147,9 +225,13 @@ function escapeHtml(text) {
 // Removed removeMessage function - no longer needed since we handle loading differently
 
 async function createNewSession() {
+    // Clean up the old session on the backend
+    if (currentSessionId) {
+        fetch(`${API_URL}/session/${currentSessionId}`, { method: 'DELETE' }).catch(() => {});
+    }
     currentSessionId = null;
     chatMessages.innerHTML = '';
-    addMessage('Welcome to the Course Materials Assistant! I can help you with questions about courses, lessons and specific content. What would you like to know?', 'assistant', null, true);
+    addMessage(TRANSLATIONS[currentLang].welcome, 'assistant', null, true);
 }
 
 // Load course statistics

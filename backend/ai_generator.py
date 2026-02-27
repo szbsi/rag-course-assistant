@@ -1,4 +1,5 @@
 import json
+import re
 from openai import OpenAI
 from typing import List, Optional, Dict, Any
 
@@ -10,9 +11,10 @@ class AIGenerator:
 
 Search Tool Usage:
 - Use the search tool **only** for questions about specific course content or detailed educational materials
-- **One search per query maximum**
+- **One search per query maximum** — never attempt a second search
 - Synthesize search results into accurate, fact-based responses
 - If search yields no results, state this clearly without offering alternatives
+- IMPORTANT: Always use the provided function calling interface. Never output function calls as raw text or XML markup.
 
 Response Protocol:
 - **General knowledge questions**: Answer using existing knowledge without searching
@@ -88,8 +90,14 @@ Provide only the direct answer to what was asked.
         if response.choices[0].finish_reason == "tool_calls" and tool_manager:
             return self._handle_tool_execution(response, messages, tool_manager)
 
-        # Return direct response
-        return response.choices[0].message.content
+        # Fallback: detect DeepSeek native DSML function call format in text content
+        content = response.choices[0].message.content
+        if tool_manager and content and '<｜DSML｜function_calls>' in content:
+            dsml_call = self._parse_dsml_tool_call(content)
+            if dsml_call:
+                return self._handle_dsml_tool_execution(dsml_call, messages, tool_manager)
+
+        return content
 
     def _handle_tool_execution(self, initial_response, messages: List, tool_manager) -> str:
         """
@@ -128,5 +136,51 @@ Provide only the direct answer to what was asked.
         }
 
         # Get final response
+        final_response = self.client.chat.completions.create(**final_params)
+        final_content = final_response.choices[0].message.content
+
+        # If the synthesis response also contains DSML, parse and execute it once more
+        if tool_manager and final_content and '<｜DSML｜function_calls>' in final_content:
+            dsml_call = self._parse_dsml_tool_call(final_content)
+            if dsml_call:
+                return self._handle_dsml_tool_execution(dsml_call, messages, tool_manager)
+
+        return final_content
+
+    def _parse_dsml_tool_call(self, content: str) -> Optional[Dict]:
+        """Parse DeepSeek native DSML function call format embedded in text content"""
+        invoke_match = re.search(
+            r'<｜DSML｜invoke name="([^"]+)">(.*?)</｜DSML｜invoke>',
+            content, re.DOTALL
+        )
+        if not invoke_match:
+            return None
+
+        tool_name = invoke_match.group(1)
+        params_block = invoke_match.group(2)
+
+        params = {}
+        for param_name, param_value in re.findall(
+            r'<｜DSML｜parameter name="([^"]+)"[^>]*>(.*?)</｜DSML｜parameter>',
+            params_block, re.DOTALL
+        ):
+            value = param_value.strip()
+            # Convert numeric strings to int for parameters like lesson_number
+            if value.lstrip('-').isdigit():
+                value = int(value)
+            params[param_name] = value
+
+        return {"tool_name": tool_name, "params": params}
+
+    def _handle_dsml_tool_execution(self, dsml_call: Dict, messages: List, tool_manager) -> str:
+        """Execute a tool call parsed from DSML format and get a follow-up response"""
+        tool_result = tool_manager.execute_tool(dsml_call["tool_name"], **dsml_call["params"])
+
+        messages.append({
+            "role": "user",
+            "content": f"Search results:\n{tool_result}\n\nPlease answer the original question using these results."
+        })
+
+        final_params = {**self.base_params, "messages": messages}
         final_response = self.client.chat.completions.create(**final_params)
         return final_response.choices[0].message.content

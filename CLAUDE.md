@@ -86,7 +86,7 @@ Lesson Link: <url>
 
 Lesson 1: <title>
 ...
-```
+``` 
 
 `DocumentProcessor` chunks each lesson's content into ~800-character segments with 100-character overlap. Chunks are stored in ChromaDB with `course_title` and `lesson_number` metadata for filtered retrieval.
 
